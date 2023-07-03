@@ -1,0 +1,384 @@
+version: "3.5"
+services:
+  zk-1:
+    image: confluentinc/cp-zookeeper:7.1.1-1-ubi8
+    container_name: zk-1
+    hostname: zk-1
+    ports:
+      - "12181:12181"
+    volumes:
+      - data-zk-log-1:/var/lib/zookeeper/log
+      - data-zk-data-1:/var/lib/zookeeper/data
+      - /home/training/sr/zk-creds:/etc/kafka/secrets
+    networks:
+      - confluent
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 12181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zk-1:2888:3888;zk-2:2888:3888;zk-3:2888:3888
+      ZOOKEEPER_AUTH_PROVIDER_SASL: org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zk-jaas.conf
+  
+  zk-2:
+    image: confluentinc/cp-zookeeper:7.1.1-1-ubi8
+    container_name: zk-2
+    hostname: zk-2
+    ports:
+      - "22181:22181"
+    volumes:
+      - data-zk-log-2:/var/lib/zookeeper/log
+      - data-zk-data-2:/var/lib/zookeeper/data
+      - /home/training/sr/zk-creds:/etc/kafka/secrets
+    networks:
+      - confluent
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: 22181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zk-1:2888:3888;zk-2:2888:3888;zk-3:2888:3888
+      ZOOKEEPER_AUTH_PROVIDER_SASL: org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zk-jaas.conf
+  
+  zk-3:
+    image: confluentinc/cp-zookeeper:7.1.1-1-ubi8
+    container_name: zk-3
+    hostname: zk-3
+    ports:
+      - "32181:32181"
+    volumes:
+      - data-zk-log-3:/var/lib/zookeeper/log
+      - data-zk-data-3:/var/lib/zookeeper/data
+      - /home/training/sr/zk-creds:/etc/kafka/secrets
+    networks:
+      - confluent
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: 32181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zk-1:2888:3888;zk-2:2888:3888;zk-3:2888:3888
+      ZOOKEEPER_AUTH_PROVIDER_SASL: org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/zk-jaas.conf
+
+  kafka-1:
+    image: confluentinc/cp-server:7.1.1-1-ubi8
+    container_name: kafka-1
+    depends_on:
+      - zk-1
+      - zk-2
+      - zk-3
+    hostname: kafka-1
+    ports:
+      - "19092:19092"
+      - "19093:19093"      
+    networks:
+      - confluent
+    volumes:
+      - data-kafka-1:/var/lib/kafka/data
+      - /home/training/sr/kafka-1-creds:/etc/kafka/secrets
+    environment:
+      KAFKA_BROKER_ID: 101
+      KAFKA_ZOOKEEPER_CONNECT: zk-1:12181,zk-2:22181,zk-3:32181
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_ENABLE: "false"
+      #KAFKA_METRIC_REPORTERS: "io.confluent.metrics.reporter.ConfluentMetricsReporter"
+      #CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+      KAFKA_LISTENERS: SSL://0.0.0.0:19093,PLAINTEXT://0.0.0.0:9092,SSL-INT://0.0.0.0:9093,SASL-INT://0.0.0.0:9095,BROKER://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-1-external:19093,PLAINTEXT://kafka-1:9092,SSL-INT://kafka-1:9093,SASL-INT://kafka-1:9095,BROKER://kafka-1:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,PLAINTEXT:PLAINTEXT,SSL-INT:SSL,SASL-INT:SASL_SSL,BROKER:SSL
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka-1-jaas.conf
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.kafka-1.keystore.pkcs12
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka-1_keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: kafka-1_sslkey_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.kafka-1.truststore.pkcs12
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka-1_truststore_creds
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "HTTPS"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      # Schema Validation
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry-1:18081,http://schema-registry-2:28081
+#      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: https://schema-registry-1:18085,https://schema-registry-2:28085
+#      KAFKA_CONFLUENT_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.kafka-1.truststore.pkcs12
+#      KAFKA_CONFLUENT_SSL_TRUSTSTORE_PASSWORD: confluent
+
+  kafka-2:
+    image: confluentinc/cp-server:7.1.1-1-ubi8
+    container_name: kafka-2
+    depends_on:
+      - zk-1
+      - zk-2
+      - zk-3
+    hostname: kafka-2
+    ports:
+      - "29092:29092"
+      - "29093:29093"  
+    networks:
+      - confluent
+    volumes:
+      - data-kafka-2:/var/lib/kafka/data
+      - /home/training/sr/kafka-2-creds:/etc/kafka/secrets
+    environment:
+      KAFKA_BROKER_ID: 102
+      KAFKA_ZOOKEEPER_CONNECT: zk-1:12181,zk-2:22181,zk-3:32181
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_ENABLE: "false"
+      #KAFKA_METRIC_REPORTERS: "io.confluent.metrics.reporter.ConfluentMetricsReporter"
+      #CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+      KAFKA_LISTENERS: SSL://0.0.0.0:29093,PLAINTEXT://0.0.0.0:9092,SSL-INT://0.0.0.0:9093,SASL-INT://0.0.0.0:9095,BROKER://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-2-external:29093,PLAINTEXT://kafka-2:9092,SSL-INT://kafka-2:9093,SASL-INT://kafka-2:9095,BROKER://kafka-2:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,PLAINTEXT:PLAINTEXT,SSL-INT:SSL,SASL-INT:SASL_SSL,BROKER:SSL
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka-2-jaas.conf
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.kafka-2.keystore.pkcs12
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka-2_keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: kafka-2_sslkey_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.kafka-2.truststore.pkcs12
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka-2_truststore_creds
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "HTTPS"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      # Schema Validation
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry-1:18081,http://schema-registry-2:28081
+#      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: https://schema-registry-1:18085,https://schema-registry-2:28085
+#      KAFKA_CONFLUENT_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.kafka-2.truststore.pkcs12
+#      KAFKA_CONFLUENT_SSL_TRUSTSTORE_PASSWORD: confluent
+
+  kafka-3:
+    image: confluentinc/cp-server:7.1.1-1-ubi8
+    container_name: kafka-3
+    depends_on:
+      - zk-1
+      - zk-2
+      - zk-3
+    hostname: kafka-3
+    ports:
+      - "39092:39092"
+      - "39093:39093"  
+    networks:
+      - confluent
+    volumes:
+      - data-kafka-3:/var/lib/kafka/data
+      - /home/training/sr/kafka-3-creds:/etc/kafka/secrets
+    environment:
+      KAFKA_BROKER_ID: 103
+      KAFKA_ZOOKEEPER_CONNECT: zk-1:12181,zk-2:22181,zk-3:32181
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_ENABLE: "false"
+      #KAFKA_METRIC_REPORTERS: "io.confluent.metrics.reporter.ConfluentMetricsReporter"
+      #CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+      KAFKA_LISTENERS: SSL://0.0.0.0:39093,PLAINTEXT://0.0.0.0:9092,SSL-INT://0.0.0.0:9093,SASL-INT://0.0.0.0:9095,BROKER://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-3-external:39093,PLAINTEXT://kafka-3:9092,SSL-INT://kafka-3:9093,SASL-INT://kafka-3:9095,BROKER://kafka-3:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,PLAINTEXT:PLAINTEXT,SSL-INT:SSL,SASL-INT:SASL_SSL,BROKER:SSL
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka-3-jaas.conf
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.kafka-3.keystore.pkcs12
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka-3_keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: kafka-3_sslkey_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.kafka-3.truststore.pkcs12
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka-3_truststore_creds
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: "HTTPS"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+
+      # Schema Validation
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry-1:18081,http://schema-registry-2:28081
+#      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: https://schema-registry-1:18085,https://schema-registry-2:28085
+#      KAFKA_CONFLUENT_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.kafka-3.truststore.pkcs12
+#      KAFKA_CONFLUENT_SSL_TRUSTSTORE_PASSWORD: confluent
+
+  control-center:
+    image: confluentinc/cp-enterprise-control-center:7.1.1-1-ubi8
+    hostname: control-center
+    container_name: control-center
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry-1
+      - schema-registry-2
+    networks:
+      - confluent
+    volumes:
+      - /home/training/sr/control-center-creds:/etc/kafka/secrets
+    ports:
+      - "9022:9022"
+    environment:
+      CONTROL_CENTER_BOOTSTRAP_SERVERS: kafka-1:9093,kafka-2:9093,kafka-3:9093
+      CONTROL_CENTER_ZOOKEEPER_CONNECT: zk-1:2181,zk-2:2181,zk-3:2181
+      CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 4
+      CONTROL_CENTER_REPLICATION_FACTOR: 3
+      CONTROL_CENTER_UI_AUTOUPDATE_ENABLE: "false"
+
+      # Amount of heap to use for internal caches. Increase for better throughput
+      CONTROL_CENTER_STREAMS_CACHE_MAX_BYTES_BUFFERING: 100000000
+      CONTROL_CENTER_STREAMS_CONSUMER_REQUEST_TIMEOUT_MS: "960032"
+      CONTROL_CENTER_STREAMS_NUM_STREAM_THREADS: 1
+
+      CONTROL_CENTER_STREAMS_SECURITY_PROTOCOL: SSL
+      CONTROL_CENTER_STREAMS_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.control-center.truststore.pkcs12
+      CONTROL_CENTER_STREAMS_SSL_TRUSTSTORE_PASSWORD: confluent
+      CONTROL_CENTER_STREAMS_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.control-center.keystore.pkcs12
+      CONTROL_CENTER_STREAMS_SSL_KEYSTORE_PASSWORD: confluent
+      CONTROL_CENTER_STREAMS_SSL_KEY_PASSWORD: confluent
+
+      # HTTP and HTTPS to Control Center UI 
+      CONTROL_CENTER_REST_LISTENERS: https://0.0.0.0:9022
+      CONTROL_CENTER_REST_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.control-center.truststore.pkcs12
+      CONTROL_CENTER_REST_SSL_TRUSTSTORE_PASSWORD: confluent
+      CONTROL_CENTER_REST_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.control-center.keystore.pkcs12
+      CONTROL_CENTER_REST_SSL_KEYSTORE_PASSWORD: confluent
+      CONTROL_CENTER_REST_SSL_KEY_PASSWORD: confluent
+
+      # Schema Registry
+      CONTROL_CENTER_SCHEMA_REGISTRY_URL: http://schema-registry-1:18081,https://schema-registry-2:28081
+#      CONTROL_CENTER_SCHEMA_REGISTRY_URL: https://schema-registry-1:18085,https://schema-registry-2:28085
+      CONTROL_CENTER_SCHEMA_REGISTRY_SCHEMA_REGISTRY_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.control-center.truststore.pkcs12
+      CONTROL_CENTER_SCHEMA_REGISTRY_SCHEMA_REGISTRY_SSL_TRUSTSTORE_PASSWORD: confluent
+
+  schema-registry-1:
+    image: confluentinc/cp-schema-registry:7.1.1-1-ubi8
+    hostname: schema-registry-1
+    container_name: schema-registry-1
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "18081:18081"
+      - "18085:18085"
+    networks:
+      - confluent
+    volumes:
+      - /home/training/sr/schema-registry-1-creds:/etc/schema-registry/secrets
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-1
+
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+
+      SCHEMA_REGISTRY_LISTENERS: "http://schema-registry-1:18081"
+#      SCHEMA_REGISTRY_LISTENERS: "https://schema-registry-1:18085"
+
+#      SCHEMA_REGISTRY_SSL_TRUSTSTORE_LOCATION: /etc/schema-registry/secrets/kafka.schema-registry-1.truststore.pkcs12
+#      SCHEMA_REGISTRY_SSL_TRUSTSTORE_PASSWORD: confluent
+#      SCHEMA_REGISTRY_SSL_KEYSTORE_LOCATION: /etc/schema-registry/secrets/kafka.schema-registry-1.keystore.pkcs12
+#      SCHEMA_REGISTRY_SSL_KEYSTORE_PASSWORD: confluent
+#      SCHEMA_REGISTRY_SSL_KEY_PASSWORD: confluent
+
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: "http"
+#      SCHEMA_REGISTRY_SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: "https"
+
+#      The default value for authentication.method is "NONE"
+
+      SCHEMA_REGISTRY_CUB_KAFKA_TIMEOUT: 120
+      SCHEMA_REGISTRY_CUB_KAFKA_MIN_BROKERS: 3
+
+
+  schema-registry-2:
+    image: confluentinc/cp-schema-registry:7.1.1-1-ubi8
+    hostname: schema-registry-2
+    container_name: schema-registry-2
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "28081:28081"
+      - "28085:28085"
+    networks:
+      - confluent
+    volumes:
+      - /home/training/sr/schema-registry-2-creds:/etc/schema-registry/secrets
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry-2
+
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+
+      SCHEMA_REGISTRY_LISTENERS: "http://schema-registry-2:28081"
+#      SCHEMA_REGISTRY_LISTENERS: "https://schema-registry-2:28085"
+
+#      SCHEMA_REGISTRY_SSL_TRUSTSTORE_LOCATION: /etc/schema-registry/secrets/kafka.schema-registry-2.truststore.pkcs12
+#      SCHEMA_REGISTRY_SSL_TRUSTSTORE_PASSWORD: confluent
+#      SCHEMA_REGISTRY_SSL_KEYSTORE_LOCATION: /etc/schema-registry/secrets/kafka.schema-registry-2.keystore.pkcs12
+#      SCHEMA_REGISTRY_SSL_KEYSTORE_PASSWORD: confluent
+#      SCHEMA_REGISTRY_SSL_KEY_PASSWORD: confluent
+
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: "http"
+#      SCHEMA_REGISTRY_SCHEMA_REGISTRY_INTER_INSTANCE_PROTOCOL: "https"
+
+#      The default value for authentication.method is "NONE"
+
+      SCHEMA_REGISTRY_CUB_KAFKA_TIMEOUT: 120
+      SCHEMA_REGISTRY_CUB_KAFKA_MIN_BROKERS: 3
+
+  restproxy:
+    image: confluentinc/cp-kafka-rest:7.1.1-1-ubi8
+    hostname: restproxy
+    container_name: restproxy
+    restart: always
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry-1
+      - schema-registry-2
+    volumes:
+      - /home/training/sr/restproxy-creds:/etc/restproxy/secrets
+    ports:
+      - 8086:8086
+    networks:
+      - confluent
+    environment:
+      KAFKA_REST_HOST_NAME: restproxy
+      KAFKA_REST_BOOTSTRAP_SERVERS: SSL-INT://kafka-1:9093,SSL-INT://kafka-2:9093
+      KAFKA_REST_LISTENERS: https://0.0.0.0:8086
+      KAFKA_REST_ADVERTISED_LISTENERS: https://restproxy-external:8086
+
+      KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry-1:18081,http://schema-registry-2:28081
+#      KAFKA_REST_SCHEMA_REGISTRY_URL: https://schema-registry-1:18085,http://schema-registry-2:28085
+#      KAFKA_REST_SCHEMA_REGISTRY_SSL_TRUSTSTORE_LOCATION: /etc/restproxy/secrets/kafka.restproxy.truststore.pkcs12
+#      KAFKA_REST_SCHEMA_REGISTRY_SSL_TRUSTSTORE_PASSWORD: confluent
+
+      KAFKA_REST_SSL_TRUSTSTORE_LOCATION: /etc/restproxy/secrets/kafka.restproxy.truststore.pkcs12
+      KAFKA_REST_SSL_TRUSTSTORE_PASSWORD: confluent
+      KAFKA_REST_SSL_KEYSTORE_LOCATION: /etc/restproxy/secrets/kafka.restproxy.keystore.pkcs12
+      KAFKA_REST_SSL_KEYSTORE_PASSWORD: confluent
+      KAFKA_REST_SSL_KEY_PASSWORD: confluent
+      KAFKA_REST_SSL_CLIENT_AUTHENTICATION: 'NONE'
+
+      KAFKA_REST_CLIENT_SECURITY_PROTOCOL: SSL
+      KAFKA_REST_CLIENT_SSL_TRUSTSTORE_LOCATION: /etc/restproxy/secrets/kafka.restproxy.truststore.pkcs12
+      KAFKA_REST_CLIENT_SSL_TRUSTSTORE_PASSWORD: confluent
+      KAFKA_REST_CLIENT_SSL_KEYSTORE_LOCATION: /etc/restproxy/secrets/kafka.restproxy.keystore.pkcs12
+      KAFKA_REST_CLIENT_SSL_KEYSTORE_PASSWORD: confluent
+      KAFKA_REST_CLIENT_SSL_KEY_PASSWORD: confluent
+
+volumes:
+  data-zk-log-1:
+  data-zk-data-1:
+  data-zk-log-2:
+  data-zk-data-2:
+  data-zk-log-3:
+  data-zk-data-3:
+  data-kafka-1:
+  data-kafka-2:
+  data-kafka-3:
+
+networks:
+  confluent:
